@@ -40,8 +40,8 @@ Install a plugin:
 /plugin install integrator@wso2-agent-skills
 ```
 
-Restart the session after installing `integrator` — its language server, hooks, and library
-discovery agent only activate on a fresh session.
+Run `/reload-plugins` after installing `integrator` to activate its language server, hooks, and
+library discovery agent.
 
 ### Option 3 - Codex
 
