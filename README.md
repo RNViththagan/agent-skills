@@ -40,9 +40,6 @@ Install a plugin:
 /plugin install integrator@wso2-agent-skills
 ```
 
-Run `/reload-plugins` after installing `integrator` to activate its language server, hooks, and
-library discovery agent.
-
 ### Option 3 - Codex
 
 Register the marketplace:
