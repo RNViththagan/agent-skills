@@ -19,53 +19,94 @@ isolated function logWorkflowOutcome(string workflowId) {
 
 ## MLLP / HL7v2 listener
 
-Same `Hl7Listener`/`Hl7Service` API as any HL7v2 Ballerina integration — the framing and parsing
-are handled for you. Start the workflow, then immediately return (accepting the message);
-separately await the result **without blocking the ack** so a failure gets logged rather than
-silently dropped:
+**There is no `Hl7Listener`/`Hl7Service` type in `ballerinax/health.hl7v2`** — do not assume one
+exists just because typed listeners exist for HTTP and File. The real, documented primitive is a
+raw `ballerina/tcp` listener with a `tcp:ConnectionService`, decoding each byte stream yourself
+with `hl7v2:parse()`. Unlike the HTTP/File examples below, **there is no implicit acknowledgment at
+this layer** — MLLP requires an explicit ACK/NAK written back over the same connection, so the
+service constructs one using the matching version package's `ACK` type and writes it with
+`caller->writeBytes()`:
 
 ```ballerina
 import ballerina/log;
+import ballerina/tcp;
 import ballerina/workflow;
 import ballerinax/health.hl7v2;
 import ballerinax/health.hl7v23;
 
 configurable int mllpPort = 2575;
 
-listener hl7v2:Hl7Listener mllpListener = new (mllpPort);
+service on new tcp:Listener(mllpPort) {
+    remote function onConnect(tcp:Caller caller) returns tcp:ConnectionService {
+        return new HL7ChannelConnectionService();
+    }
+}
 
-service hl7v2:Hl7Service on mllpListener {
+service class HL7ChannelConnectionService {
+    *tcp:ConnectionService;
+
     // No `|error` in the return type — see the convention above. A failure to even start the
-    // workflow is caught and logged here, never returned to the caller.
-    isolated remote function onMessage(hl7v2:Hl7Client caller, hl7v2:Message message) returns error? {
-        // The workflow input must be `anydata` — wrap the parsed message plus any sourceMap-equivalent
-        // metadata into a single input record (see ChannelInput in types.bal).
-        ChannelInput input = {rawMessage: message.toBaOm().toJson()};
+    // workflow is caught and logged here, never returned to the caller; the ACK/NAK code below is
+    // how the failure is actually communicated back to the sender.
+    remote function onBytes(tcp:Caller caller, readonly & byte[] data) returns tcp:Error? {
+        hl7v23:ADT_A01|error parsedMsg = hl7v2:parse(data).ensureType(hl7v23:ADT_A01);
+        if parsedMsg is error {
+            log:printError("Could not parse inbound HL7 message", 'error = parsedMsg);
+            return; // no MSH to build a matching ACK from — connection is simply left open
+        }
 
-        string|error workflowId = workflow:run(processChannelMessage, input);
+        // The workflow input must be `anydata` (WORKFLOW_101) — hl7v23:ADT_A01 is not, so
+        // re-encode to the wire string and re-parse inside the workflow (Phase 4) rather than
+        // passing the typed message itself.
+        byte[]|hl7v2:HL7Error encoded = hl7v2:encode("2.3", parsedMsg);
+        string|error workflowId = encoded is hl7v2:HL7Error
+            ? encoded
+            : workflow:run(processChannelMessage, <ChannelInput>{rawMessage: check string:fromBytes(encoded)});
+
+        string ackCode = "AA";
         if workflowId is error {
             log:printError("Failed to start workflow for inbound HL7 message", 'error = workflowId);
-            return; // still ack — see convention above; ballerina's default MLLP ack is sent here
+            ackCode = "AE";
+        } else {
+            log:printInfo("Started workflow", workflowId = workflowId);
+            // Ordinary service-level code, NOT inside a @workflow:Workflow function, so `start`
+            // is fine here (unlike inside the workflow function itself — see Phase 4). Await the
+            // result off to the side so the ACK below isn't held up by it.
+            _ = start logWorkflowOutcome(workflowId);
         }
-        log:printInfo("Started workflow", workflowId = workflowId);
 
-        // This is ordinary service-level code, NOT inside a @workflow:Workflow function, so
-        // `start` is perfectly fine here (unlike inside the workflow function itself — see
-        // Phase 4). Await the result off to the side so the ack above isn't held up by it.
-        _ = start logWorkflowOutcome(workflowId);
-        // Function returns normally here — the MLLP ack is sent regardless of eventual
-        // workflow outcome. A failed workflow has already raised a review task (Phase 7/12);
-        // it does not need a second, synchronous signal back to the sender.
+        // A failed workflow has already raised a review task (Phase 7/12) — the ACK/NAK below is
+        // a transport-level acknowledgment, not a second synchronous failure signal.
+        error? ackError = self.sendAck(caller, parsedMsg.msh.msh10, ackCode);
+        if ackError is error {
+            log:printError("Failed to send HL7 ACK", 'error = ackError);
+        }
+    }
+
+    isolated function sendAck(tcp:Caller caller, string controlId, string ackCode) returns error? {
+        // Field names below follow this library's <segment-abbreviation><field-number> pattern
+        // (confirmed for msh9/msh10/msh12 against the base module's own samples) — confirm
+        // msa1/msa2 against the live hl7v23 module reference before shipping, the same caution as
+        // the review-task payload shape flagged in Phase 12.
+        hl7v23:ACK ack = {
+            msh: {msh9: {cm_msg1: "ACK"}, msh10: controlId, msh12: "2.3"},
+            msa: {msa1: ackCode, msa2: controlId}
+        };
+        byte[] encoded = check hl7v2:encode("2.3", ack);
+        check caller->writeBytes(encoded);
+    }
+
+    remote function onError(tcp:Error err) {
+        log:printError("Error on HL7 connection", 'error = err);
     }
 }
 ```
 
-> `hl7v2:Message` is not itself `anydata` in a form `workflow:run()` can accept directly — the
-> workflow input parameter must be a subtype of `anydata` (`WORKFLOW_101`). Convert or wrap it into
-> a plain record/JSON-friendly type in `types.bal` before calling `workflow:run()`. Re-parsing
-> inside the workflow (via an early pure helper, or the first activity if parsing needs external
-> terminology lookups) is the usual pattern — do **not** try to smuggle a non-`anydata` object
-> through as workflow input.
+> **Confirm before shipping:** whether the transport adds/strips the MLLP start/end block bytes
+> (`0x0B` … `0x1C 0x0D`) automatically depends on how the TCP listener is configured — a plain
+> `ballerina/tcp` listener does not do this for you, so `data` and the outgoing ACK bytes may need
+> that envelope stripped/added manually. Verify against the live transport configuration rather
+> than assuming either way.
 
 ## HTTP source connector
 

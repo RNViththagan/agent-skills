@@ -47,6 +47,14 @@ Ballerina project** that reproduces the channel's behavior using `ballerina/work
   `workflow:run()`/`workflow:getWorkflowResult()` ends in error, the listener logs it and still
   acknowledges receipt (HTTP `202 Accepted`, an HL7 `AA` ack, a completed file-watcher callback) —
   it never returns that error from the `resource`/`remote` function. See Phase 3.
+- **HL7v2 and FHIR data stay in the library's own types — never repackaged into a hand-rolled
+  record that duplicates fields under different names.** A parsed message is an `hl7v23:ADT_A01`
+  (or the matching version's message type), read directly (`adt.pid?.pid5?[0]?.xpn1`), not
+  flattened into a custom "patient" record. FHIR-bound data goes through the matching
+  `health.hl7v2<ver>.utils.v2tofhirr4` mapping functions into the FHIR library's own resource/Bundle
+  shape, sent via `health.clients.fhir:FHIRConnector`, never a custom record posted through a raw
+  `http:Client`. A custom type is still fine with no library equivalent (`ChannelInput`/`ChannelResult`)
+  — the rule is not reinventing what the library already models. See Phase 3, Phase 7, and Phase 9.
 
 ---
 
@@ -333,9 +341,10 @@ separate queue component.
 ## Phase 9: MLLP Sender (TCP Dispatcher) as an Activity
 
 Same activity shape as any other destination (Phase 7), using `health.clients.hl7:HL7Client` —
-which handles MLLP framing automatically, so do not wrap bytes manually. See
-`references/activity-examples.md` for the full `sendToDownstream` activity and its
-`ctx->callActivity()` call site.
+its own implementation writes encoded bytes straight to the TCP socket with no visible MLLP
+envelope wrapping, so confirm with the target server whether framing needs to be added explicitly
+rather than assuming it's handled for you. See `references/activity-examples.md` for the full
+`sendToDownstream` activity and its `ctx->callActivity()` call site.
 
 ---
 

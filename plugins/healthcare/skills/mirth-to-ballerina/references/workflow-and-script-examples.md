@@ -7,6 +7,7 @@ Consulted during Phase 4 (Model the Message Flow) and Phase 6 (Channel-Level Scr
 
 ```ballerina
 import ballerina/workflow;
+import ballerinax/health.hl7v23;
 
 @workflow:Workflow
 function processChannelMessage(workflow:Context ctx, ChannelInput input) returns ChannelResult|error {
@@ -19,26 +20,31 @@ function processChannelMessage(workflow:Context ctx, ChannelInput input) returns
         return {status: "FILTERED"};
     }
 
-    // 3. Source transformer equivalent — pure data shaping, plain function call.
-    PatientRecord patient = check extractPatient(normalized);
+    // 3. Source transformer equivalent — pure data shaping, plain function call. Parses into the
+    //    library's own typed message (hl7v23:ADT_A01) rather than a hand-rolled record — see
+    //    references/activity-examples.md for why.
+    hl7v23:ADT_A01 adt = check parseAdt(normalized);
+    string patientId = adt.pid?.pid3?[0]?.cx1 ?: "";
 
     // 4. Side-effect / lookup step with external I/O — this DOES need an activity. Every
     //    callActivity call always carries a human-review retryPolicy (Phase 7) — never
     //    AutoRetry, never the default NoAutomaticRetry.
-    boolean patientExists = check ctx->callActivity(lookupPatientInDb, {"patientId": patient.patientId},
+    boolean patientExists = check ctx->callActivity(lookupPatientInDb, {"patientId": patientId},
             stepId = "lookup_patient_in_db",
             retryPolicy = {userRoles: "OPS", title: "Patient lookup failed"});
 
     // 5. Destinations — separate durable activities, called sequentially, each critical or
     //    non-critical, each with a human-review retryPolicy. See Phase 12 for the full pattern
     //    with skip-on-failure. Activities return ConnectionError|ExecutionError on failure
-    //    (Phase "Error Types"), never a bare error.
-    string reservationId = check ctx->callActivity(sendToFhirServer, {"patient": patient},
+    //    (Phase "Error Types"), never a bare error. The FHIR bundle is derived from the raw
+    //    message via the library's own v2ToFhir() mapper, not a custom "patient" shape.
+    json fhirBundle = check translateToFhirBundle(normalized);
+    string reservationId = check ctx->callActivity(sendToFhirServer, {"fhirBundle": fhirBundle},
             stepId = "send_to_fhir",
             retryPolicy = {userRoles: "MANAGER", title: "Failure sending patient to FHIR server"});
 
     string|ConnectionError|ExecutionError auditResult = ctx->callActivity(writeAuditLog,
-            {"patientId": patient.patientId}, stepId = "write_audit_log",
+            {"patientId": patientId}, stepId = "write_audit_log",
             retryPolicy = {userRoles: "OPS", title: "Failure writing audit log"});
 
     // 6. Postprocessor equivalent — results are already local variables, just assemble the outcome.

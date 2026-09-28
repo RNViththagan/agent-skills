@@ -19,17 +19,19 @@ function (Phase 4) — there is no separate "drop silently" mechanism to invoke.
 
 ## Transformers — plain functions unless they need external data
 
+**Parse into the library's own typed message, don't repackage into a custom record.** The version
+package's message type (`hl7v23:ADT_A01`, etc.) already models every field Mirth's JS would have
+read off `msg['PID']...` — there's no need for a hand-rolled `PatientRecord`-style type that just
+duplicates a subset of `PID`'s fields under different names:
+
 ```ballerina
-isolated function extractPatient(string normalized) returns PatientRecord|error {
-    hl7v23:ADT_A01 adt = check parseAdt(normalized);
-    return {
-        patientId: adt.pid?.pid3?[0]?.cx1 ?: "",
-        lastName:  adt.pid?.pid5?[0]?.xpn1 ?: "",
-        firstName: adt.pid?.pid5?[0]?.xpn2 ?: "",
-        dob:       adt.pid?.pid7?.ts1 ?: ""
-    };
-}
+isolated function parseAdt(string normalized) returns hl7v23:ADT_A01|error
+    => hl7v2:parse(normalized).ensureType(hl7v23:ADT_A01);
 ```
+
+Downstream code reads whatever fields it needs directly off the parsed message — e.g.
+`string patientId = adt.pid?.pid3?[0]?.cx1 ?: "";` — rather than through a custom accessor, exactly
+as shown in Ballerina's own HL7 guides (`adtMsg.pid.pid5`, etc.).
 
 **HL7v2 field access — always use optional chaining, never assume fields exist:**
 
@@ -62,31 +64,51 @@ Called with a human-review `retryPolicy`, exactly like every other activity in t
 
 ```ballerina
 boolean|ConnectionError|ExecutionError patientExists = ctx->callActivity(lookupPatientInDb,
-        {"patientId": patient.patientId}, stepId = "lookup_patient_in_db",
+        {"patientId": patientId}, stepId = "lookup_patient_in_db",
         retryPolicy = {userRoles: "OPS", title: "Patient lookup failed"});
 ```
 
 ## Destinations — activities, called sequentially (see Phase 12 for critical/non-critical)
 
+**When the destination is a FHIR server, don't hand-build a request against a raw `http:Client`.**
+`ballerinax/health.clients.fhir` provides a dedicated `FHIRConnector` with typed `create`/`update`/
+`'transaction`/`search` operations, and `ballerinax/health.hl7v2<ver>.utils.v2tofhirr4` converts an
+HL7v2 message straight into a standards-compliant FHIR Bundle (`v2ToFhir()`) instead of the skill
+hand-mapping PID fields into a custom "patient" shape:
+
 ```ballerina
+import ballerinax/health.clients.fhir;
+import ballerinax/health.hl7v23.utils.v2tofhirr4;
+
+configurable string fhirServerUrl = "https://fhir.example.com/fhir/r4";
+
+final fhir:FHIRConnector fhirConnector = check new ({baseURL: fhirServerUrl, mimeType: fhir:FHIR_JSON});
+
+// Pure — v2ToFhir() maps segments to resources per the official HL7 v2-to-FHIR IG; no custom
+// per-field extraction to hand-maintain.
+isolated function translateToFhirBundle(string normalized) returns json|error
+    => v2tofhirr4:v2ToFhir(normalized);
+
 @workflow:Activity
-isolated function sendToFhirServer(PatientRecord patient) returns string|ConnectionError|ExecutionError {
-    http:Client|error fhirClient = new (fhirServerUrl);
-    if fhirClient is error {
-        return error ConnectionError("Could not connect to FHIR server", fhirClient, url = fhirServerUrl);
-    }
-    json|error response = fhirClient->/Patient.post(patient);
+isolated function sendToFhirServer(json fhirBundle) returns string|ConnectionError|ExecutionError {
+    fhir:FHIRResponse|error response = fhirConnector->'transaction(fhirBundle);
     if response is error {
-        return error ExecutionError("FHIR server rejected the request", response, patientId = patient.patientId);
+        return error ExecutionError("FHIR server rejected the request", response);
     }
     // Response transformer equivalent: inspect the response here before returning.
-    string|error id = response.id;
+    string|error id = response.'resource.id;
     if id is error {
         return error ExecutionError("FHIR response missing id field", id);
     }
     return id;
 }
 ```
+
+`FHIRConnector`'s own client-level connection failures (DNS, refused connection, TLS) surface as
+`error` from the `->` call same as `response is error` above — classify a failure at that layer as
+`ConnectionError` instead of `ExecutionError` if the two need to be told apart for a given channel;
+the example above keeps it simple because `'transaction()` doesn't distinguish the two cases in its
+return type.
 
 Project convention — human-review `retryPolicy` on every call, no exceptions:
 
@@ -108,11 +130,10 @@ configurable int destPort = 2575;
 
 final hl7:HL7Client hl7SenderClient = check new (destHost, destPort);
 
-// HL7Client handles MLLP framing automatically — do not wrap bytes manually.
 @workflow:Activity
-isolated function sendToDownstream(json messageJson) returns json|ConnectionError|ExecutionError {
-    hl7v2:Message|error msg = hl7v2:parse(messageJson.toString());
-    if msg is error {
+isolated function sendToDownstream(string encodedMessage) returns json|ConnectionError|ExecutionError {
+    hl7v2:Message|hl7v2:HL7Error msg = hl7v2:parse(encodedMessage);
+    if msg is hl7v2:HL7Error {
         return error ExecutionError("Could not re-parse HL7 message before send", msg);
     }
     hl7v2:Message|hl7v2:HL7Error ack = hl7SenderClient->sendMessage(msg);
@@ -125,12 +146,17 @@ isolated function sendToDownstream(json messageJson) returns json|ConnectionErro
 }
 ```
 
+> `HL7Client.sendMessage()`'s own implementation (`writeToHL7Stream`) writes the encoded bytes
+> straight to the TCP socket with no visible MLLP start/end block wrapping — confirm whether the
+> target server expects a raw encoded message or a full MLLP envelope (`0x0B` … `0x1C 0x0D`) around
+> it before shipping; do not assume framing is handled for you on the sending side either.
+
 Called from the workflow function exactly like any other destination activity — always with the
 human-review `retryPolicy`:
 
 ```ballerina
 json|ConnectionError|ExecutionError ackResult = ctx->callActivity(sendToDownstream,
-        {"messageJson": normalized}, stepId = "send_hl7_downstream",
+        {"encodedMessage": normalized}, stepId = "send_hl7_downstream",
         retryPolicy = {userRoles: "MANAGER", title: "Failure in HL7 Sender"});
 ```
 

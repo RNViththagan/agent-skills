@@ -8,12 +8,18 @@ in the last column, where the Mirth destination becomes an `@workflow:Activity` 
 
 ## Connector class → Ballerina equivalent
 
+There is no dedicated `Hl7Listener`/`Hl7Service` type in `ballerinax/health.hl7v2` — do not assume
+one. The real, documented primitive for receiving HL7v2 over TCP/MLLP is a raw `ballerina/tcp`
+listener plus a `tcp:ConnectionService`, decoding each byte stream with `hl7v2:parse()`. See
+`references/source-connector-examples.md` for the full pattern, including how the ACK/NAK is
+constructed and written back explicitly (there is no implicit ack at this layer).
+
 | Mirth connector class | Ballerina equivalent | Role in the workflow design |
 |---|---|---|
-| `com.mirth.connect.connectors.tcp.TcpReceiver` (MLLP) | `hl7v2:Hl7Listener` + `hl7v2:Hl7Service` | Source — starts a workflow via `workflow:run()` per message |
+| `com.mirth.connect.connectors.tcp.TcpReceiver` (MLLP) | `tcp:Listener` + `tcp:ConnectionService`, decoding with `hl7v2:parse()` | Source — starts a workflow via `workflow:run()` per message |
 | `com.mirth.connect.connectors.tcp.TcpDispatcher` (MLLP) | `health.clients.hl7:HL7Client` | Destination — wrapped in an `@workflow:Activity` (Phase 9) |
 | `com.mirth.connect.connectors.http.HttpReceiver` | `http:Listener` service | Source — starts a workflow via `workflow:run()` |
-| `com.mirth.connect.connectors.http.HttpDispatcher` | `http:Client` | Destination — wrapped in an `@workflow:Activity` |
+| `com.mirth.connect.connectors.http.HttpDispatcher` | `http:Client` — or, when the destination is specifically a FHIR server, `health.clients.fhir:FHIRConnector` (see Phase 7/9) | Destination — wrapped in an `@workflow:Activity` |
 | `com.mirth.connect.connectors.file.FileReceiver` | `file:Listener` + `io` | Source — starts a workflow via `workflow:run()` |
 | `com.mirth.connect.connectors.file.FileDispatcher` | `io:fileWriteString` | Destination — wrapped in an `@workflow:Activity` |
 | `com.mirth.connect.connectors.jdbc.DatabaseReader` | `sql` + DB connector | Source, or a lookup step — if a lookup mid-channel, an `@workflow:Activity` |
@@ -36,14 +42,15 @@ Add to `Ballerina.toml` based on what connectors are present:
 
 | Connector type | Dependency to add |
 |---|---|
-| HL7v2 MLLP listener/sender | `ballerinax/health.hl7v2`, the matching version package (e.g. `health.hl7v23`), `ballerinax/health.clients.hl7` |
+| HL7v2 MLLP listener/sender | `ballerina/tcp` (listener side), `ballerinax/health.hl7v2`, the matching version package (e.g. `health.hl7v23`), `ballerinax/health.clients.hl7` (sender side) |
 | HTTP | (stdlib `ballerina/http`, no extra dep) |
 | File | (stdlib `ballerina/file`, `ballerina/io`) |
 | Database (MySQL) | `ballerinax/mysql` + `ballerina/sql` |
 | Database (PostgreSQL) | `ballerinax/postgresql` + `ballerina/sql` |
 | Email/SMTP | `ballerina/email` |
 | FTP/SFTP | `ballerina/ftp` |
-| HL7v2 → FHIR conversion | `ballerinax/health.hl7v2<ver>.utils.v2tofhirr4` |
+| HL7v2 → FHIR conversion | `ballerinax/health.hl7v2<ver>.utils.v2tofhirr4` (e.g. `health.hl7v23.utils.v2tofhirr4`) — use its `v2ToFhir()` for a full message → FHIR Bundle conversion, or its segment-level mapping functions (`pidToPatientName`, etc.) for a single field |
+| FHIR server destination | `ballerinax/health.clients.fhir` (`FHIRConnector`) instead of a raw `http:Client` |
 | **Always include** | `ballerina/workflow`, `ballerina/log`, `ballerina/uuid`, `ballerina/time` |
 | **Never include** | `xlibb/pipeline` — no pipeline object exists in this design; `ballerinax/rabbitmq` for failure/dead-letter storage — the workflow engine's own event history is the durability mechanism, so a separate message-store dependency is not needed unless the channel also uses RabbitMQ as an actual destination/source in its own right |
 

@@ -26,7 +26,7 @@ classification (Phase 12, Step 1) and the `title`/`userRoles` written into the r
 
 ```ballerina
 // CRITICAL destination, Mirth queue mode "Always" — high urgency, ops-owned.
-string ackResult = check ctx->callActivity(sendHl7WithAckCheck, {"messageJson": normalized},
+string ackResult = check ctx->callActivity(sendHl7WithAckCheck, {"encodedMessage": normalized},
         stepId = "send_hl7_downstream",
         retryPolicy = {userRoles: "OPS", title: "Failure in HL7 Sender — blocks downstream delivery"});
 
@@ -44,9 +44,9 @@ triggers the review task on the calling `ctx->callActivity()`, same as any other
 
 ```ballerina
 @workflow:Activity
-isolated function sendHl7WithAckCheck(json messageJson) returns hl7v2:Message|ConnectionError|ExecutionError {
-    hl7v2:Message|error msg = hl7v2:parse(messageJson.toString());
-    if msg is error {
+isolated function sendHl7WithAckCheck(string encodedMessage) returns hl7v2:Message|ConnectionError|ExecutionError {
+    hl7v2:Message|hl7v2:HL7Error msg = hl7v2:parse(encodedMessage);
+    if msg is hl7v2:HL7Error {
         return error ExecutionError("Could not re-parse HL7 message before send", msg);
     }
     hl7v2:Message|hl7v2:HL7Error ack = hl7SenderClient->sendMessage(msg);
