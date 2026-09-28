@@ -9,6 +9,11 @@
       "title": "Agent Manager",
       "description": "Skills for building, deploying, and operating AI agents.",
       "skills": ["manage-agent"]
+    },
+    {
+      "title": "Healthcare",
+      "description": "Skills for building healthcare integrations in Ballerina, including HL7v2 and FHIR support.",
+      "skills": ["mirth-to-ballerina"]
     }
   ]
 }
