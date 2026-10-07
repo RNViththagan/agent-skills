@@ -1,0 +1,41 @@
+# Core task quality for the integrator skill.
+
+- description: "Q1 missing Ballerina skill: give the install command"
+  vars:
+    request: >-
+      I installed only the WSO2 Integrator skill with npx and the Ballerina skill is
+      not available in this agent. Build me an integration that copies new Salesforce
+      leads into a PostgreSQL table.
+  assert:
+    - type: skill-used
+      value: integrator
+    - type: contains
+      value: "npx skills add ballerina-platform/skills"
+    - type: llm-rubric
+      value: >-
+        PASS only if the reply tells the user to install the Ballerina skill with
+        `npx skills add ballerina-platform/skills`, explains it cannot install skills
+        itself, and does not write the integration's Ballerina code before that skill
+        is installed.
+      threshold: 0.7
+
+- description: "Q2 library integration: lib.bal and strict.library import"
+  vars:
+    request: >-
+      In my WSO2 Integrator project, add a library integration called shared_utils
+      for common date helpers. Tell me exactly which files to create and what goes in them.
+  assert:
+    - type: skill-used
+      value: integrator
+    - type: contains
+      value: "lib.bal"
+    - type: contains
+      value: "import wso2/strict.library as _;"
+    - type: llm-rubric
+      value: >-
+        PASS only if the reply (a) creates shared_utils as its own directory with a
+        Ballerina.toml containing a [package] section, (b) adds that directory to the
+        packages array of the root workspace Ballerina.toml, (c) includes a lib.bal with
+        `import wso2/strict.library as _;`, and (d) uses the words "integration" and
+        "project" rather than "package" and "workspace" when talking to the user.
+      threshold: 0.7
