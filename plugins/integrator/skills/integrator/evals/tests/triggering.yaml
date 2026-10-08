@@ -64,15 +64,6 @@
     - type: not-skill-used
       value: integrator
 
-- description: "T6 integrator: Ballerina Integrator alias"
-  vars:
-    request: >-
-      Using Ballerina Integrator, create an automation that emails a daily summary of
-      new Jira tickets. Show the files in your reply instead of writing them.
-  assert:
-    - type: skill-used
-      value: integrator
-
 - description: "T7 integrator: the plugin README's example prompt, as a user types it"
   vars:
     request: "Add a library integration for shared date helpers to my WSO2 Integrator project."

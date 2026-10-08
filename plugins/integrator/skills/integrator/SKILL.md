@@ -1,8 +1,8 @@
 ---
 name: integrator
-description: Entry point for WSO2 Integrator work. Use only when the user names WSO2 Integrator
-  (also known as Ballerina Integrator) — to add an integration, automation, service, or library
-  integration to their project, or to change one. Applies WSO2 Integrator conventions and hands
+description: Entry point for WSO2 Integrator work. Use only when the user names WSO2 Integrator —
+  to add an integration, automation, service, or library integration to their project, or to
+  change one. Applies WSO2 Integrator conventions and hands
   the code work to the Ballerina skill, or gives the command to install it when it is missing.
   Without a WSO2 Integrator mention, Ballerina programs, services, and integrations — even ones
   that connect systems — go straight to the Ballerina skill.

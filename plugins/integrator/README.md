@@ -7,7 +7,7 @@ this plugin also installs the Ballerina plugin, which writes, builds, runs, and 
 
 | Skill | Triggers |
 |-------|----------|
-| **integrator** | Any request that names WSO2 Integrator (or Ballerina Integrator): add or change an integration, automation, service, or library integration in a project |
+| **integrator** | Any request that names WSO2 Integrator: add or change an integration, automation, service, or library integration in a project |
 
 Code work is handed to the **ballerina** skill from the Ballerina plugin.
 
