@@ -44,13 +44,6 @@ Install a plugin:
 
 Installing `integrator` also installs `ballerina`.
 
-**Upgrading `integrator` from 0.4.x:** `integrator` now depends on `ballerina`, and an update
-does not install a new dependency on its own — until it does, `integrator` does not load. After
-updating, run the install command once more:
-```
-/plugin install integrator@wso2-agent-skills
-```
-
 Uninstalling `integrator` leaves `ballerina` installed; remove it with `claude plugin prune`.
 
 ### Option 3 - Codex
