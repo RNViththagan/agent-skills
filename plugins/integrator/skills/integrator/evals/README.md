@@ -10,23 +10,28 @@ npm install                      # installs the agent SDK(s)
 # log in once (no API key needed locally):
 #   claude        (Claude)   /   codex        (Codex)
 npx promptfoo@latest eval -c promptfooconfig.yaml -o output.json --no-cache --no-share
+npx promptfoo@latest eval -c promptfooconfig.no-ballerina.yaml --no-cache --no-share
 npx promptfoo@latest view
 ```
+
+There are two configs. `promptfooconfig.yaml` enables the `integrator` and `ballerina` skills
+and runs `tests/triggering.yaml` and `tests/task-quality.yaml`. `promptfooconfig.no-ballerina.yaml`
+enables only `integrator`, so the Ballerina skill is genuinely unavailable, and runs
+`tests/missing-ballerina.yaml`.
+
+Results vary between runs; use `--repeat 3` and treat a test as passing when it passes at
+least two of three.
 
 Requires Node >= 22.22.
 
 ## Fixtures
 
-`fixtures/workspace/` holds **real copies** of the skill under
-`.claude/skills/integrator`. After editing the skill, refresh them
-from the repo root with the central tool:
+`fixtures/workspace/` holds:
 
-```bash
-node tools/sync-fixtures.js integrator integrator
-```
-
-## What to fill in
-
-`tests/triggering.yaml` and `tests/task-quality.yaml` ship with TODOs — replace
-them with real cases for this skill (a positive trigger, a boundary/negative
-case, and a representative task with deterministic checks + one rubric).
+- `.claude/skills/integrator` — a **real copy** of the skill. After editing the skill, refresh it
+  from the repo root with `node tools/sync-fixtures.js integrator integrator`.
+- `.claude/skills/ballerina` — a hand-written stub carrying only the Ballerina skill's
+  description, so triggering tests have a competitor. `sync-fixtures.js` does not touch it; keep
+  its description in step with ballerina-platform/skills.
+- `projects/multi` and `projects/single` — read-only sample projects (one with several
+  integrations, one with a single integration) that the layout tests point at.
