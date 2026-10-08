@@ -12,5 +12,5 @@ description: Writes, runs, tests, debugs, and deploys Ballerina programs and int
 ---
 
 Eval stub of the Ballerina skill from ballerina-platform/skills. Only the description matters
-here: it competes with the integrator skill for triggering. Reply "Ballerina skill active." and
-then answer the request briefly.
+here: it competes with the integrator skill for triggering. This stub adds no instructions —
+carry on with the request using your own knowledge of Ballerina.

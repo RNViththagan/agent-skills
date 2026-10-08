@@ -5,7 +5,8 @@
   vars:
     request: >-
       I'm using WSO2 Integrator. Add a new integration to my project that reads a CSV
-      file from an FTP server every hour and upserts the rows into Salesforce.
+      file from an FTP server every hour and upserts the rows into Salesforce. Show the
+      files in your reply instead of writing them.
   assert:
     - type: skill-used
       value: integrator
@@ -14,11 +15,14 @@
         PASS only if the reply (a) calls the new unit an "integration" and the
         workspace a "project", (b) says the hourly schedule is configured at
         deployment rather than written as a timer or cron in code, and (c) does
-        not ask the user to install anything (the Ballerina skill is available).
+        not ask the user to install a skill or plugin (the Ballerina skill is
+        available). Adding Ballerina library dependencies is fine.
 
 - description: "T2 integrator: WSO2 Integrator automation"
   vars:
-    request: "Create a WSO2 Integrator automation that posts new GitHub issues to a Slack channel."
+    request: >-
+      Create a WSO2 Integrator automation that posts new GitHub issues to a Slack channel.
+      Show the files in your reply instead of writing them.
   assert:
     - type: skill-used
       value: integrator
