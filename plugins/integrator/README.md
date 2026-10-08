@@ -7,7 +7,7 @@ this plugin also installs the Ballerina plugin, which writes, builds, runs, and 
 
 | Skill | Triggers |
 |-------|----------|
-| **integrator** | Add an integration, automation, service, or library integration to a WSO2 Integrator project; wire connectors between systems; any request that names WSO2 Integrator |
+| **integrator** | Any request that names WSO2 Integrator (or Ballerina Integrator): add or change an integration, automation, service, or library integration in a project |
 
 Code work is handed to the **ballerina** skill from the Ballerina plugin.
 
@@ -22,5 +22,5 @@ See the [installation instructions](../../README.md#installation) in the main RE
 > Create a WSO2 Integrator automation that posts new GitHub issues to Slack.
 ```
 ```
-> Add a library integration for shared date helpers to my project.
+> Add a library integration for shared date helpers to my WSO2 Integrator project.
 ```

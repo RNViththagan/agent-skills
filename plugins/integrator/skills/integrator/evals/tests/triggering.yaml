@@ -72,3 +72,10 @@
   assert:
     - type: skill-used
       value: integrator
+
+- description: "T7 integrator: the plugin README's example prompt, as a user types it"
+  vars:
+    request: "Add a library integration for shared date helpers to my WSO2 Integrator project."
+  assert:
+    - type: skill-used
+      value: integrator

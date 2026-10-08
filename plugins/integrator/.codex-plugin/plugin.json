@@ -21,7 +21,7 @@
     "defaultPrompt": [
       "Add a new integration to my WSO2 Integrator project that syncs Salesforce contacts to a database.",
       "Create a WSO2 Integrator automation that posts new GitHub issues to Slack.",
-      "Add a library integration for shared date helpers to my project."
+      "Add a library integration for shared date helpers to my WSO2 Integrator project."
     ]
   }
 }
