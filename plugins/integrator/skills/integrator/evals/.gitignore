@@ -2,3 +2,6 @@ node_modules/
 output.json
 .promptfoo/
 fixtures/workspace/api-reports/
+fixtures/workspace/.claude/skills/integrator/
+fixtures/workspace/.agents/skills/integrator/
+fixtures/workspace/.claude/skills/ballerina/
