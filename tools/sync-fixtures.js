@@ -52,7 +52,7 @@ function syncSkill(plugin, skill) {
     .map(([, dir]) => path.join(evalsDir, 'fixtures', 'workspace', dir, 'skills', skill));
 
   if (!layouts.length) {
-    console.warn(`  (skip) ${plugin}/${skill}: no known provider in evals/promptfooconfig*.yaml`);
+    console.warn(`  (skip) ${plugin}/${skill}: no known provider (${LAYOUTS.map(([id]) => id).join(', ')}) in evals/promptfooconfig*.yaml`);
     return 0;
   }
   for (const dest of layouts) {
@@ -106,5 +106,7 @@ if (argv[0] === '--all') {
     fail('plugin and skill must contain only letters, digits, dashes, or underscores');
   }
   console.log(`${plugin}/${skill}:`);
-  syncSkill(plugin, skill);
+  // Fail when nothing was copied, so `npm run eval` stops instead of running
+  // promptfoo against a fixture workspace with no skill in it.
+  if (!syncSkill(plugin, skill)) process.exit(1);
 }
