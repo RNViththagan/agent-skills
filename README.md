@@ -8,8 +8,7 @@ Official Agent skills for building and managing with WSO2 products.
 |--------|-------------|
 | [api-platform](./plugins/api-platform/README.md) | Design, assess, and fix OpenAPI specs; deploy and manage APIs via the WSO2 API Gateway |
 | [agent-manager](./plugins/agent-manager/README.md) | Deploy and inspect agents; tail logs, metrics, and traces; triage runtime failures |
-| [integrator](./plugins/integrator/README.md) | Build integrations, automations, and services with WSO2 Integrator; installs the Ballerina plugin for the code work |
-| [ballerina](https://github.com/ballerina-platform/skills) | Write, build, run, and test Ballerina code; connector discovery and `.bal` code intelligence. Installed with `integrator` |
+| [integrator](./plugins/integrator/README.md) | Build integrations, automations, and services with WSO2 Integrator; includes the Ballerina skill that writes, runs, and tests the code |
 | [healthcare](./plugins/healthcare/README.md) | Write services and integrations in Ballerina for healthcare applications, including HL7v2 and FHIR support |
 
 ## Installation
@@ -21,8 +20,8 @@ Install all WSO2 skills:
 npx skills add wso2/agent-skills
 ```
 
-This installs the `integrator` skill. The Ballerina skill it hands code work to lives in
-[ballerina-platform/skills](https://github.com/ballerina-platform/skills); install it too:
+The `integrator` skill hands the code work to the Ballerina skill, which comes from
+[ballerina-platform/skills](https://github.com/ballerina-platform/skills). With npx, add it as well:
 ```
 npx skills add ballerina-platform/skills
 ```
@@ -42,9 +41,8 @@ Install a plugin:
 /plugin install healthcare@wso2-agent-skills
 ```
 
-Installing `integrator` also installs `ballerina`.
-
-Uninstalling `integrator` leaves `ballerina` installed; remove it with `claude plugin prune`.
+`integrator` brings the Ballerina skill with it: installing `integrator` installs it automatically.
+Uninstalling `integrator` leaves it installed; remove it with `claude plugin prune`.
 
 ### Option 3 - Codex
 
