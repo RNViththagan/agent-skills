@@ -42,7 +42,10 @@ Install a plugin:
 ```
 
 `integrator` brings the Ballerina skill with it: installing `integrator` installs it automatically.
-Uninstalling `integrator` leaves it installed; remove it with `claude plugin prune`.
+To uninstall both, run:
+```
+claude plugin uninstall integrator@wso2-agent-skills --prune
+```
 
 ### Option 3 - Codex
 
